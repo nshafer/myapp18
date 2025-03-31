@@ -219,33 +219,4 @@ defmodule Myapp18.Accounts.UserToken do
   def delete_all_query(tokens) do
     from t in UserToken, where: t.id in ^Enum.map(tokens, & &1.id)
   end
-
-  @doc """
-  Returns a query that returns all expired tokens for the given context.
-
-  The context must be one of the following:
-  - "login"
-  - "session"
-  - "change_email"
-  """
-  def expired_tokens_for_context_query("login") do
-    from t in UserToken,
-      where:
-        t.context == "login" and
-          t.inserted_at < ago(^@magic_link_validity_in_minutes, "minute")
-  end
-
-  def expired_tokens_for_context_query("session") do
-    from t in UserToken,
-      where:
-        t.context == "session" and
-          (is_nil(t.refreshed_at) or t.refreshed_at < ago(@session_validity_in_days, "day"))
-  end
-
-  def expired_tokens_for_context_query("change_email") do
-    from t in UserToken,
-      where:
-        like(t.context, "change:%") and
-          t.inserted_at < ago(@change_email_validity_in_days, "day")
-  end
 end

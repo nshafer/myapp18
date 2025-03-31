@@ -311,27 +311,6 @@ defmodule Myapp18.Accounts do
     :ok
   end
 
-  ## Maintenance
-
-  @doc """
-  Delete all expired UserTokens.
-
-  This includes all "session" tokens that have not been refreshed in the configured refresh
-  period (or have never been refreshed) and all other tokens that are older than their
-  configured validity periods as configured in `UserToken`.
-
-  Returns a list with the number of deleted tokens for each context:
-  - "login" tokens, including all magic link tokens.
-  - "session" tokens stored in the user's session and remember me cookie.
-  - "change_email" tokens sent via email when changing the email address.
-  """
-  def prune_user_tokens() do
-    {l, nil} = UserToken.expired_tokens_for_context_query("login") |> Repo.delete_all()
-    {s, nil} = UserToken.expired_tokens_for_context_query("session") |> Repo.delete_all()
-    {c, nil} = UserToken.expired_tokens_for_context_query("change_email") |> Repo.delete_all()
-    [l, s, c]
-  end
-
   ## Token helper
 
   defp update_user_and_delete_all_tokens(changeset) do
