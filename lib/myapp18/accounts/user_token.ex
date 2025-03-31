@@ -83,8 +83,7 @@ defmodule Myapp18.Accounts.UserToken do
   end
 
   @doc """
-  Returns a query for all valid session UserTokens for the given token,
-  along with the related User in a tuple.
+  Returns a query for all valid Users and UserTokens for the given token.
 
   The query will return nothing if the token is invalid or the user is not found.
 
@@ -92,22 +91,9 @@ defmodule Myapp18.Accounts.UserToken do
   a user attached to it, and it has been refreshed in the last
   @session_validity_in_days days.
   """
-  def valid_user_auth_query(token) do
-    from [token, user] in valid_user_token_query(token),
-      select: {token, %{user | authenticated_at: token.inserted_at}}
-  end
-
-  @doc """
-  Returns a query for users with valid sessions for the given token.
-
-  The token is valid if it matches the value in the database, it has
-  a user attached to it, and it has been refreshed in the last
-  @session_validity_in_days days.
-  """
   def valid_session_token_query(token) do
     from [token, user] in valid_user_token_query(token),
-      select: user,
-      select_merge: %{authenticated_at: token.inserted_at}
+      select: {%{user | authenticated_at: token.inserted_at}, token}
   end
 
   @doc """

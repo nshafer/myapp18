@@ -187,22 +187,13 @@ defmodule Myapp18.Accounts do
   end
 
   @doc """
-  Gets the user with the given signed token.
+  Gets the user and token with the given signed token.
+
+  If the token is valid `{user, token}` is returned, otherwise `nil` is returned.
   """
   def get_user_by_session_token(token) do
     UserToken.valid_session_token_query(token)
     |> Repo.one()
-  end
-
-  @doc """
-  Gets the `UserToken` and `User` for a given session token.
-
-  This will always return `{user_token, user}, or `{nil, nil}` if
-  the token is invalid or expired.
-  """
-  def get_user_auth_by_session_token(token) do
-    UserToken.valid_user_auth_query(token)
-    |> Repo.one() || {nil, nil}
   end
 
   @doc """

@@ -275,9 +275,11 @@ defmodule Myapp18.AccountsTest do
     end
 
     test "returns user by token", %{user: user, token: token} do
-      assert session_user = Accounts.get_user_by_session_token(token)
+      assert {session_user, session_user_token} = Accounts.get_user_by_session_token(token)
       assert session_user.id == user.id
       assert session_user.authenticated_at != nil
+      assert session_user_token.user_id == user.id
+      assert session_user_token.token == token
     end
 
     test "does not return user for invalid token" do
@@ -291,31 +293,6 @@ defmodule Myapp18.AccountsTest do
     end
   end
 
-  describe "get_user_auth_by_session_token/1" do
-    setup do
-      user = user_fixture()
-      token = Accounts.generate_user_session_token(user)
-      %{user: user, token: token}
-    end
-
-    test "returns user token with user by token", %{user: user, token: token} do
-      assert {auth_user_token, auth_user} = Accounts.get_user_auth_by_session_token(token)
-      assert auth_user_token.token == token
-      assert auth_user.id == user.id
-      assert auth_user.authenticated_at != nil
-    end
-
-    test "does not return user token for invalid token" do
-      assert {nil, nil} = Accounts.get_user_auth_by_session_token("oops")
-    end
-
-    test "does not return user token for expired token", %{token: token} do
-      long_ago = ~U[2020-01-01 00:00:00Z]
-      {1, nil} = Repo.update_all(UserToken, set: [inserted_at: long_ago, refreshed_at: long_ago])
-      assert {nil, nil} = Accounts.get_user_auth_by_session_token(token)
-    end
-  end
-
   describe "refresh_user_session_token/1" do
     setup do
       user = user_fixture()
@@ -326,17 +303,17 @@ defmodule Myapp18.AccountsTest do
     end
 
     test "refreshes the token", %{token: token} do
-      assert {user_token, _} = Accounts.get_user_auth_by_session_token(token)
+      assert {_, user_token} = Accounts.get_user_by_session_token(token)
       assert UserToken.seconds_since_refresh(user_token) >= 60 * 60 * 24 * 3
       assert 1 = Accounts.refresh_user_session_token(token)
-      assert {refreshed_user_token, _} = Accounts.get_user_auth_by_session_token(token)
+      assert {_, refreshed_user_token} = Accounts.get_user_by_session_token(token)
       assert refreshed_user_token.token == token
       assert refreshed_user_token.context == "session"
       assert DateTime.compare(refreshed_user_token.refreshed_at, user_token.refreshed_at) == :gt
     end
 
     test "does not refresh for expired token", %{token: token} do
-      assert {user_token, _} = Accounts.get_user_auth_by_session_token(token)
+      assert {_, user_token} = Accounts.get_user_by_session_token(token)
       long_ago = ~U[2020-01-01 00:00:00Z]
       {1, nil} = Repo.update_all(UserToken, set: [inserted_at: long_ago, refreshed_at: long_ago])
       assert 0 = Accounts.refresh_user_session_token(token)

@@ -167,7 +167,7 @@ defmodule Myapp18Web.UserAuthTest do
       dt = DateTime.add(DateTime.utc_now(), amount_to_add, unit)
       query = from ut in UserToken, where: ut.token == ^token
       {1, nil} = Repo.update_all(query, set: [inserted_at: dt, refreshed_at: dt])
-      {user_token, _} = Accounts.get_user_auth_by_session_token(token)
+      {_, user_token} = Accounts.get_user_by_session_token(token)
       user_token
     end
 
@@ -182,7 +182,7 @@ defmodule Myapp18Web.UserAuthTest do
 
       assert conn.assigns.current_scope.user.id == user.id
       assert get_session(conn, :user_token) == token
-      assert {user_token, _} = Accounts.get_user_auth_by_session_token(token)
+      assert {_, user_token} = Accounts.get_user_by_session_token(token)
       assert UserToken.seconds_since_refresh(user_token) >= 60 * 60 * 3
     end
 
@@ -197,7 +197,7 @@ defmodule Myapp18Web.UserAuthTest do
 
       assert conn.assigns.current_scope.user.id == user.id
       assert get_session(conn, :user_token) == token
-      assert {user_token, _} = Accounts.get_user_auth_by_session_token(token)
+      assert {_, user_token} = Accounts.get_user_by_session_token(token)
       assert UserToken.seconds_since_refresh(user_token) < 60
     end
 
