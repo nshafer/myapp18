@@ -192,7 +192,7 @@ defmodule Myapp18.Accounts do
   If the token is valid `{user, token_created}` is returned, otherwise `nil` is returned.
   """
   def get_user_by_session_token(token) do
-    UserToken.valid_user_and_user_token_query(token)
+    UserToken.valid_user_session_query(token)
     |> Repo.one()
   end
 

@@ -157,7 +157,7 @@ defmodule Myapp18Web.UserAuthTest do
       refute conn.assigns.current_scope
     end
 
-    test "does not refresh the session token after only a few hours", %{conn: conn, user: user} do
+    test "does not reissue the session token after only a few hours", %{conn: conn, user: user} do
       {token, user_token} = generate_offset_user_session_token(user, -2, :day)
       assert DateTime.diff(DateTime.utc_now(), user_token.inserted_at) >= 2 * 24 * 60 * 60
       {user, _} = Accounts.get_user_by_session_token(token)
@@ -192,7 +192,7 @@ defmodule Myapp18Web.UserAuthTest do
       assert DateTime.diff(DateTime.utc_now(), new_user_token.inserted_at) < 60
     end
 
-    test "refreshes the remember_me cookie if the token is refreshed", %{conn: conn, user: user} do
+    test "refreshes the remember_me cookie if the token is reissued", %{conn: conn, user: user} do
       logged_in_conn =
         conn |> fetch_cookies() |> UserAuth.log_in_user(user, %{"remember_me" => "true"})
 

@@ -112,7 +112,7 @@ defmodule Myapp18Web.UserAuth do
   @doc """
   Authenticates the user by looking into the session and remember me token.
 
-  Will refresh the session token if it is older than the configured refresh age.
+  Will reissue the session token if it is older than the configured age.
   """
   def fetch_current_scope_for_user(conn, _opts) do
     with(
@@ -141,7 +141,7 @@ defmodule Myapp18Web.UserAuth do
     end
   end
 
-  # Reissue the session token if it is older than the configured refresh age.
+  # Reissue the session token if it is older than the configured reissue age.
   defp maybe_reissue_user_session_token(conn, user, token, token_created) do
     token_age = DateTime.diff(DateTime.utc_now(), token_created, :day)
 
