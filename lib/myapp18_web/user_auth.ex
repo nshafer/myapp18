@@ -5,13 +5,12 @@ defmodule Myapp18Web.UserAuth do
   import Phoenix.Controller
 
   alias Myapp18.Accounts
-  alias Myapp18.Accounts.UserToken
   alias Myapp18.Accounts.Scope
 
   # Make the remember me cookie valid for 60 days.
   # If you want bump or reduce this value, also change
   # the token expiry itself in UserToken.
-  @max_session_age_in_days 60
+  @max_session_age_in_days 14
 
   # How old the session token should be before it is refreshed. You can reduce this so that
   # the session token is refreshed more often by an active user, but it will also cause more
@@ -122,16 +121,15 @@ defmodule Myapp18Web.UserAuth do
   Will refresh the session token if it is older than the configured refresh age.
   """
   def fetch_current_scope_for_user(conn, _opts) do
-    {token, conn} = ensure_user_token(conn)
-
-    if token do
-      {user, user_token} = Accounts.get_user_by_session_token(token) || {nil, nil}
-
+    with(
+      {token, conn} <- ensure_user_token(conn),
+      {user, user_token} <- Accounts.get_user_by_session_token(token)
+    ) do
       conn
       |> assign(:current_scope, Scope.for_user(user))
-      |> maybe_refresh_user_session_token(user_token)
+      |> maybe_reissue_user_session_token(user_token)
     else
-      assign(conn, :current_scope, Scope.for_user(nil))
+      nil -> assign(conn, :current_scope, Scope.for_user(nil))
     end
   end
 
@@ -144,30 +142,37 @@ defmodule Myapp18Web.UserAuth do
       if token = conn.cookies[@remember_me_cookie] do
         {token, conn |> put_token_in_session(token) |> put_session(:user_remember_me, true)}
       else
-        {nil, conn}
+        nil
       end
     end
   end
 
-  # Refresh the session token if it is older than the configured refresh age.
-  defp maybe_refresh_user_session_token(conn, nil), do: conn
+  # Reissue the session token if it is older than the configured refresh age.
+  defp maybe_reissue_user_session_token(conn, user_token) do
+    token_age = DateTime.diff(DateTime.utc_now(), user_token.inserted_at, :second)
 
-  defp maybe_refresh_user_session_token(conn, user_token) do
-    if UserToken.seconds_since_refresh(user_token) > @session_refresh_age_in_hours * 60 * 60 do
-      Accounts.refresh_user_session_token(user_token.token)
-      maybe_refresh_remember_me_cookie(conn, user_token.token)
+    if token_age > @session_refresh_age_in_hours * 60 * 60 do
+      case Accounts.reissue_user_session_token(user_token) do
+        {:ok, new_token} ->
+          conn
+          |> put_token_in_session(new_token.token)
+          |> maybe_refresh_remember_me_cookie(user_token, new_token)
+
+        {:error, _} ->
+          conn
+      end
     else
       conn
     end
   end
 
-  # Refresh the remember me cookie if it is set and it is the same as the session token.
+  # Refresh the remember me cookie if it is set and it is the same as the old session token.
   # This is to ensure the remember me cookie has the same expiration time as the session token.
-  defp maybe_refresh_remember_me_cookie(conn, token) do
+  defp maybe_refresh_remember_me_cookie(conn, old_user_token, new_user_token) do
     conn = fetch_cookies(conn, signed: [@remember_me_cookie])
 
-    if conn.cookies[@remember_me_cookie] == token do
-      put_resp_cookie(conn, @remember_me_cookie, token, @remember_me_options)
+    if conn.cookies[@remember_me_cookie] == old_user_token.token do
+      put_resp_cookie(conn, @remember_me_cookie, new_user_token.token, @remember_me_options)
     else
       conn
     end

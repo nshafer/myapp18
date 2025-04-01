@@ -10,13 +10,13 @@ defmodule Myapp18.Accounts.UserToken do
   # since someone with access to the email may take over the account.
   @magic_link_validity_in_minutes 15
   @change_email_validity_in_days 7
-  @session_validity_in_days 60
+  @session_validity_in_days 14
 
   schema "users_tokens" do
     field :token, :binary
     field :context, :string
     field :sent_to, :string
-    field :refreshed_at, :utc_datetime
+    field :authenticated_at, :utc_datetime
     belongs_to :user, Myapp18.Accounts.User
 
     timestamps(type: :utc_datetime, updated_at: false)
@@ -41,33 +41,17 @@ defmodule Myapp18.Accounts.UserToken do
   and devices in the UI and allow users to explicitly expire any
   session they deem invalid.
   """
-  def build_session_token(user) do
+  def build_session_token(user_id, authenticated_at \\ DateTime.utc_now(:second)) do
     token = :crypto.strong_rand_bytes(@rand_size)
 
     {token,
      %UserToken{
        token: token,
        context: "session",
-       user_id: user.id,
-       refreshed_at: DateTime.utc_now(:second)
+       user_id: user_id,
+       authenticated_at: authenticated_at
      }}
   end
-
-  @doc """
-  Returns the number of seconds since the user token was last refreshed.
-
-  This is mainly for use with "session" tokens. If the token is a session
-  token that has never refreshed, it returns `0`.
-
-  All other token types return `nil`.
-  """
-  def seconds_since_refresh(%UserToken{context: "session", refreshed_at: nil}), do: 0
-
-  def seconds_since_refresh(%UserToken{context: "session", refreshed_at: refreshed_at}) do
-    DateTime.diff(DateTime.utc_now(:second), refreshed_at, :second)
-  end
-
-  def seconds_since_refresh(%UserToken{refreshed_at: nil}), do: nil
 
   @doc """
   Returns a query for all valid session UserTokens for the given token.
@@ -76,10 +60,10 @@ defmodule Myapp18.Accounts.UserToken do
   a user attached to it, and it has been refreshed in the last
   @session_validity_in_days days.
   """
-  def valid_user_token_query(token) do
+  def valid_user_session_token_query(token) do
     from token in by_token_and_context_query(token, "session"),
       join: user in assoc(token, :user),
-      where: token.refreshed_at > ago(@session_validity_in_days, "day")
+      where: token.inserted_at > ago(@session_validity_in_days, "day")
   end
 
   @doc """
@@ -91,9 +75,9 @@ defmodule Myapp18.Accounts.UserToken do
   a user attached to it, and it has been refreshed in the last
   @session_validity_in_days days.
   """
-  def valid_session_token_query(token) do
-    from [token, user] in valid_user_token_query(token),
-      select: {%{user | authenticated_at: token.inserted_at}, token}
+  def valid_user_and_user_token_query(token) do
+    from [token, user] in valid_user_session_token_query(token),
+      select: {%{user | authenticated_at: token.authenticated_at}, token}
   end
 
   @doc """

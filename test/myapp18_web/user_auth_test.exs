@@ -166,14 +166,14 @@ defmodule Myapp18Web.UserAuthTest do
     defp offset_user_token(token, amount_to_add, unit) do
       dt = DateTime.add(DateTime.utc_now(), amount_to_add, unit)
       query = from ut in UserToken, where: ut.token == ^token
-      {1, nil} = Repo.update_all(query, set: [inserted_at: dt, refreshed_at: dt])
+      {1, nil} = Repo.update_all(query, set: [inserted_at: dt, authenticated_at: dt])
       {_, user_token} = Accounts.get_user_by_session_token(token)
       user_token
     end
 
     test "does not refresh the session token after only a few hours", %{conn: conn, user: user} do
       {token, user_token} = generate_offset_user_session_token(user, -12, :hour)
-      assert UserToken.seconds_since_refresh(user_token) >= 12 * 60 * 60
+      assert DateTime.diff(DateTime.utc_now(), user_token.inserted_at) >= 12 * 60 * 60
 
       conn =
         conn
@@ -182,13 +182,15 @@ defmodule Myapp18Web.UserAuthTest do
 
       assert conn.assigns.current_scope.user.id == user.id
       assert get_session(conn, :user_token) == token
-      assert {_, user_token} = Accounts.get_user_by_session_token(token)
-      assert UserToken.seconds_since_refresh(user_token) >= 60 * 60 * 3
+      assert {_, after_user_token} = Accounts.get_user_by_session_token(token)
+      assert after_user_token.token == user_token.token
+      assert after_user_token.inserted_at == user_token.inserted_at
+      assert after_user_token.authenticated_at == user_token.authenticated_at
     end
 
-    test "refreshes the session token after a few days", %{conn: conn, user: user} do
+    test "reissues a new token after a few days", %{conn: conn, user: user} do
       {token, user_token} = generate_offset_user_session_token(user, -55, :hour)
-      assert UserToken.seconds_since_refresh(user_token) >= 55 * 60 * 60
+      assert DateTime.diff(DateTime.utc_now(), user_token.inserted_at) >= 55 * 60 * 60
 
       conn =
         conn
@@ -196,9 +198,11 @@ defmodule Myapp18Web.UserAuthTest do
         |> UserAuth.fetch_current_scope_for_user([])
 
       assert conn.assigns.current_scope.user.id == user.id
-      assert get_session(conn, :user_token) == token
-      assert {_, user_token} = Accounts.get_user_by_session_token(token)
-      assert UserToken.seconds_since_refresh(user_token) < 60
+      assert new_token = get_session(conn, :user_token)
+      assert new_token != token
+      assert {_, new_user_token} = Accounts.get_user_by_session_token(new_token)
+      assert new_user_token.authenticated_at == user_token.authenticated_at
+      assert DateTime.diff(DateTime.utc_now(), new_user_token.inserted_at) < 60
     end
 
     test "refreshes the remember_me cookie if the token is refreshed", %{conn: conn, user: user} do
@@ -209,7 +213,7 @@ defmodule Myapp18Web.UserAuthTest do
       %{value: signed_token} = logged_in_conn.resp_cookies[@remember_me_cookie]
 
       user_token = offset_user_token(token, -48, :hour)
-      assert UserToken.seconds_since_refresh(user_token) >= 48 * 60 * 60
+      assert DateTime.diff(DateTime.utc_now(), user_token.inserted_at) >= 48 * 60 * 60
 
       conn =
         conn
@@ -218,7 +222,8 @@ defmodule Myapp18Web.UserAuthTest do
         |> fetch_cookies()
         |> UserAuth.fetch_current_scope_for_user([])
 
-      assert get_session(conn, :user_token) == conn.cookies[@remember_me_cookie]
+      assert new_token = get_session(conn, :user_token)
+      assert new_token == conn.cookies[@remember_me_cookie]
       assert %{value: signed_token, max_age: max_age} = conn.resp_cookies[@remember_me_cookie]
       assert signed_token != get_session(conn, :user_token)
       assert max_age == @remember_me_cookie_max_age
