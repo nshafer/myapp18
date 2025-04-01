@@ -41,29 +41,10 @@ defmodule Myapp18.Accounts.UserToken do
   and devices in the UI and allow users to explicitly expire any
   session they deem invalid.
   """
-  def build_session_token(user_id, authenticated_at \\ DateTime.utc_now(:second)) do
+  def build_session_token(user) do
     token = :crypto.strong_rand_bytes(@rand_size)
-
-    {token,
-     %UserToken{
-       token: token,
-       context: "session",
-       user_id: user_id,
-       authenticated_at: authenticated_at
-     }}
-  end
-
-  @doc """
-  Returns a query for all valid session UserTokens for the given token.
-
-  The token is valid if it matches the value in the database, it has
-  a user attached to it, and it has been refreshed in the last
-  @session_validity_in_days days.
-  """
-  def valid_user_session_token_query(token) do
-    from token in by_token_and_context_query(token, "session"),
-      join: user in assoc(token, :user),
-      where: token.inserted_at > ago(@session_validity_in_days, "day")
+    dt = user.authenticated_at || DateTime.utc_now(:second)
+    {token, %UserToken{token: token, context: "session", user_id: user.id, authenticated_at: dt}}
   end
 
   @doc """
@@ -76,8 +57,10 @@ defmodule Myapp18.Accounts.UserToken do
   @session_validity_in_days days.
   """
   def valid_user_and_user_token_query(token) do
-    from [token, user] in valid_user_session_token_query(token),
-      select: {%{user | authenticated_at: token.authenticated_at}, token}
+    from token in by_token_and_context_query(token, "session"),
+      join: user in assoc(token, :user),
+      where: token.inserted_at > ago(@session_validity_in_days, "day"),
+      select: {%{user | authenticated_at: token.authenticated_at}, token.inserted_at}
   end
 
   @doc """

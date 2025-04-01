@@ -9,10 +9,9 @@ defmodule Myapp18Web.UserAuthTest do
   alias Myapp18Web.UserAuth
 
   import Myapp18.AccountsFixtures
-  import Ecto.Query, only: [from: 2]
 
   @remember_me_cookie "_myapp18_web_user_remember_me"
-  @remember_me_cookie_max_age 60 * 60 * 24 * 60
+  @remember_me_cookie_max_age 60 * 60 * 24 * 14
 
   setup %{conn: conn} do
     conn =
@@ -20,7 +19,7 @@ defmodule Myapp18Web.UserAuthTest do
       |> Map.replace!(:secret_key_base, Myapp18Web.Endpoint.config(:secret_key_base))
       |> init_test_session(%{})
 
-    %{user: %{user_fixture() | authenticated_at: DateTime.utc_now()}, conn: conn}
+    %{user: %{user_fixture() | authenticated_at: DateTime.utc_now(:second)}, conn: conn}
   end
 
   describe "log_in_user/3" do
@@ -79,7 +78,7 @@ defmodule Myapp18Web.UserAuthTest do
       conn = conn |> UserAuth.log_in_user(user, %{})
       assert %{value: signed_token, max_age: max_age} = conn.resp_cookies[@remember_me_cookie]
       assert signed_token != get_session(conn, :user_token)
-      assert max_age == 5_184_000
+      assert max_age == @remember_me_cookie_max_age
       assert get_session(conn, :user_remember_me) == true
     end
   end
@@ -158,22 +157,10 @@ defmodule Myapp18Web.UserAuthTest do
       refute conn.assigns.current_scope
     end
 
-    defp generate_offset_user_session_token(user, amount_to_add, unit) do
-      token = Accounts.generate_user_session_token(user)
-      {token, offset_user_token(token, amount_to_add, unit)}
-    end
-
-    defp offset_user_token(token, amount_to_add, unit) do
-      dt = DateTime.add(DateTime.utc_now(), amount_to_add, unit)
-      query = from ut in UserToken, where: ut.token == ^token
-      {1, nil} = Repo.update_all(query, set: [inserted_at: dt, authenticated_at: dt])
-      {_, user_token} = Accounts.get_user_by_session_token(token)
-      user_token
-    end
-
     test "does not refresh the session token after only a few hours", %{conn: conn, user: user} do
-      {token, user_token} = generate_offset_user_session_token(user, -12, :hour)
-      assert DateTime.diff(DateTime.utc_now(), user_token.inserted_at) >= 12 * 60 * 60
+      {token, user_token} = generate_offset_user_session_token(user, -2, :day)
+      assert DateTime.diff(DateTime.utc_now(), user_token.inserted_at) >= 2 * 24 * 60 * 60
+      {user, _} = Accounts.get_user_by_session_token(token)
 
       conn =
         conn
@@ -181,16 +168,16 @@ defmodule Myapp18Web.UserAuthTest do
         |> UserAuth.fetch_current_scope_for_user([])
 
       assert conn.assigns.current_scope.user.id == user.id
+      assert conn.assigns.current_scope.user.authenticated_at == user.authenticated_at
       assert get_session(conn, :user_token) == token
-      assert {_, after_user_token} = Accounts.get_user_by_session_token(token)
-      assert after_user_token.token == user_token.token
-      assert after_user_token.inserted_at == user_token.inserted_at
-      assert after_user_token.authenticated_at == user_token.authenticated_at
+      assert {_, token_created} = Accounts.get_user_by_session_token(token)
+      assert DateTime.diff(DateTime.utc_now(), token_created) >= 12 * 60 * 60
     end
 
     test "reissues a new token after a few days", %{conn: conn, user: user} do
-      {token, user_token} = generate_offset_user_session_token(user, -55, :hour)
-      assert DateTime.diff(DateTime.utc_now(), user_token.inserted_at) >= 55 * 60 * 60
+      {token, user_token} = generate_offset_user_session_token(user, -10, :day)
+      assert DateTime.diff(DateTime.utc_now(), user_token.inserted_at) >= 10 * 24 * 60 * 60
+      {user, _} = Accounts.get_user_by_session_token(token)
 
       conn =
         conn
@@ -198,10 +185,10 @@ defmodule Myapp18Web.UserAuthTest do
         |> UserAuth.fetch_current_scope_for_user([])
 
       assert conn.assigns.current_scope.user.id == user.id
+      assert conn.assigns.current_scope.user.authenticated_at == user.authenticated_at
       assert new_token = get_session(conn, :user_token)
       assert new_token != token
-      assert {_, new_user_token} = Accounts.get_user_by_session_token(new_token)
-      assert new_user_token.authenticated_at == user_token.authenticated_at
+      assert new_user_token = Repo.get_by!(UserToken, token: new_token)
       assert DateTime.diff(DateTime.utc_now(), new_user_token.inserted_at) < 60
     end
 
@@ -212,20 +199,23 @@ defmodule Myapp18Web.UserAuthTest do
       token = logged_in_conn.cookies[@remember_me_cookie]
       %{value: signed_token} = logged_in_conn.resp_cookies[@remember_me_cookie]
 
-      user_token = offset_user_token(token, -48, :hour)
-      assert DateTime.diff(DateTime.utc_now(), user_token.inserted_at) >= 48 * 60 * 60
+      user_token = offset_user_token(token, -10, :day)
+      assert DateTime.diff(DateTime.utc_now(), user_token.inserted_at) >= 10 * 24 * 60 * 60
+      {user, _} = Accounts.get_user_by_session_token(token)
 
       conn =
         conn
         |> put_session(:user_token, token)
         |> put_req_cookie(@remember_me_cookie, signed_token)
-        |> fetch_cookies()
         |> UserAuth.fetch_current_scope_for_user([])
 
+      assert conn.assigns.current_scope.user.id == user.id
+      assert conn.assigns.current_scope.user.authenticated_at == user.authenticated_at
       assert new_token = get_session(conn, :user_token)
+      assert new_token != token
       assert new_token == conn.cookies[@remember_me_cookie]
-      assert %{value: signed_token, max_age: max_age} = conn.resp_cookies[@remember_me_cookie]
-      assert signed_token != get_session(conn, :user_token)
+      assert %{value: new_signed_token, max_age: max_age} = conn.resp_cookies[@remember_me_cookie]
+      assert new_signed_token != signed_token
       assert max_age == @remember_me_cookie_max_age
     end
   end

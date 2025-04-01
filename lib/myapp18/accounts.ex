@@ -181,15 +181,15 @@ defmodule Myapp18.Accounts do
   Generates a session token.
   """
   def generate_user_session_token(user) do
-    {token, user_token} = UserToken.build_session_token(user.id)
+    {token, user_token} = UserToken.build_session_token(user)
     Repo.insert!(user_token)
     token
   end
 
   @doc """
-  Gets the user and token with the given signed token.
+  Gets the user with the given signed token.
 
-  If the token is valid `{user, token}` is returned, otherwise `nil` is returned.
+  If the token is valid `{user, token_created}` is returned, otherwise `nil` is returned.
   """
   def get_user_by_session_token(token) do
     UserToken.valid_user_and_user_token_query(token)
@@ -206,42 +206,6 @@ defmodule Myapp18.Accounts do
     else
       _ -> nil
     end
-  end
-
-  @doc """
-  Issues a new session token to replace the given user_token.
-
-  The `user_token` will be deleted, and a new token will be returned. The new token will
-  have its `authenticated_at` set to the same value as the old token.
-
-  Returns `{:ok, new_token}` if the token was successfully reissued, `{:error, :not_found}` if
-  the token was not found or invalid, or `{:error, error}` if there was another error.
-  """
-  def reissue_user_session_token(user_token) do
-    with {:ok, %{new_token: new_token}} <- reissue_user_token_atomically(user_token) do
-      {:ok, new_token}
-    else
-      {:error, :new_token, :not_found, _} ->
-        {:error, :not_found}
-
-      {:error, _, error, _} ->
-        {:error, error}
-    end
-  end
-
-  defp reissue_user_token_atomically(user_token) do
-    Ecto.Multi.new()
-    |> Ecto.Multi.delete_all(:deleted, UserToken.valid_user_session_token_query(user_token.token))
-    |> Ecto.Multi.run(:new_token, fn
-      _repo, %{deleted: {1, _}} ->
-        %{user_id: user_id, authenticated_at: authenticated_at} = user_token
-        {_, new_token} = UserToken.build_session_token(user_id, authenticated_at)
-        Repo.insert(new_token)
-
-      _repo, %{deleted: {0, _}} ->
-        {:error, :not_found}
-    end)
-    |> Repo.transaction()
   end
 
   @doc """
