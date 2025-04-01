@@ -188,10 +188,12 @@ defmodule Myapp18.Accounts do
 
   @doc """
   Gets the user with the given signed token.
+
+  If the token is valid `{user, token_created}` is returned, otherwise `nil` is returned.
   """
   def get_user_by_session_token(token) do
-    {:ok, query} = UserToken.verify_session_token_query(token)
-    Repo.one(query)
+    UserToken.valid_user_session_query(token)
+    |> Repo.one()
   end
 
   @doc """

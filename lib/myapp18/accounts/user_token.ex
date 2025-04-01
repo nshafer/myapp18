@@ -10,12 +10,13 @@ defmodule Myapp18.Accounts.UserToken do
   # since someone with access to the email may take over the account.
   @magic_link_validity_in_minutes 15
   @change_email_validity_in_days 7
-  @session_validity_in_days 60
+  @session_validity_in_days 14
 
   schema "users_tokens" do
     field :token, :binary
     field :context, :string
     field :sent_to, :string
+    field :authenticated_at, :utc_datetime
     belongs_to :user, Myapp18.Accounts.User
 
     timestamps(type: :utc_datetime, updated_at: false)
@@ -42,26 +43,23 @@ defmodule Myapp18.Accounts.UserToken do
   """
   def build_session_token(user) do
     token = :crypto.strong_rand_bytes(@rand_size)
-    {token, %UserToken{token: token, context: "session", user_id: user.id}}
+    dt = user.authenticated_at || DateTime.utc_now(:second)
+    {token, %UserToken{token: token, context: "session", user_id: user.id, authenticated_at: dt}}
   end
 
   @doc """
-  Checks if the token is valid and returns its underlying lookup query.
+  Returns a query for for a user and the token's creation time for the given token.
 
-  The query returns the user found by the token, if any.
+  The query will return nothing if the token is invalid or the user is not found.
 
   The token is valid if it matches the value in the database and it has
   not expired (after @session_validity_in_days).
   """
-  def verify_session_token_query(token) do
-    query =
-      from token in by_token_and_context_query(token, "session"),
-        join: user in assoc(token, :user),
-        where: token.inserted_at > ago(@session_validity_in_days, "day"),
-        select: user,
-        select_merge: %{authenticated_at: token.inserted_at}
-
-    {:ok, query}
+  def valid_user_session_query(token) do
+    from token in by_token_and_context_query(token, "session"),
+      join: user in assoc(token, :user),
+      where: token.inserted_at > ago(@session_validity_in_days, "day"),
+      select: {%{user | authenticated_at: token.authenticated_at}, token.inserted_at}
   end
 
   @doc """

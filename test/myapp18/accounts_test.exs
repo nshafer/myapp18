@@ -254,6 +254,7 @@ defmodule Myapp18.AccountsTest do
       token = Accounts.generate_user_session_token(user)
       assert user_token = Repo.get_by(UserToken, token: token)
       assert user_token.context == "session"
+      assert user_token.authenticated_at != nil
 
       # Creating the same token for another user should fail
       assert_raise Ecto.ConstraintError, fn ->
@@ -263,6 +264,13 @@ defmodule Myapp18.AccountsTest do
           context: "session"
         })
       end
+    end
+
+    test "duplicates the authenticated_at of given user in new token", %{user: user} do
+      user = %{user | authenticated_at: DateTime.add(DateTime.utc_now(:second), -3600)}
+      token = Accounts.generate_user_session_token(user)
+      assert user_token = Repo.get_by(UserToken, token: token)
+      assert user_token.authenticated_at == user.authenticated_at
     end
   end
 
@@ -274,8 +282,10 @@ defmodule Myapp18.AccountsTest do
     end
 
     test "returns user by token", %{user: user, token: token} do
-      assert session_user = Accounts.get_user_by_session_token(token)
+      assert {session_user, token_created} = Accounts.get_user_by_session_token(token)
       assert session_user.id == user.id
+      assert session_user.authenticated_at != nil
+      assert token_created != nil
     end
 
     test "does not return user for invalid token" do
@@ -283,7 +293,8 @@ defmodule Myapp18.AccountsTest do
     end
 
     test "does not return user for expired token", %{token: token} do
-      {1, nil} = Repo.update_all(UserToken, set: [inserted_at: ~N[2020-01-01 00:00:00]])
+      dt = ~N[2020-01-01 00:00:00]
+      {1, nil} = Repo.update_all(UserToken, set: [inserted_at: dt, authenticated_at: dt])
       refute Accounts.get_user_by_session_token(token)
     end
   end

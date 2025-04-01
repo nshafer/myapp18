@@ -8,6 +8,8 @@ defmodule Myapp18.AccountsFixtures do
 
   alias Myapp18.Accounts
   alias Myapp18.Accounts.Scope
+  alias Myapp18.Accounts.UserToken
+  alias Myapp18.Repo
 
   def unique_user_email, do: "user#{System.unique_integer()}@example.com"
   def valid_user_password, do: "hello world!"
@@ -71,9 +73,34 @@ defmodule Myapp18.AccountsFixtures do
     )
   end
 
+  def override_token_authenticated_at(token, authenticated_at) when is_binary(token) do
+    Myapp18.Repo.update_all(
+      from(t in Accounts.UserToken,
+        where: t.token == ^token
+      ),
+      set: [authenticated_at: authenticated_at]
+    )
+  end
+
   def generate_user_magic_link_token(user) do
     {encoded_token, user_token} = Accounts.UserToken.build_email_token(user, "login")
     Myapp18.Repo.insert!(user_token)
     {encoded_token, user_token.token}
+  end
+
+  def generate_offset_user_session_token(user, amount_to_add, unit) do
+    token = Accounts.generate_user_session_token(user)
+    {token, offset_user_token(token, amount_to_add, unit)}
+  end
+
+  def offset_user_token(token, amount_to_add, unit) do
+    dt = DateTime.add(DateTime.utc_now(), amount_to_add, unit)
+
+    Repo.update_all(
+      from(ut in UserToken, where: ut.token == ^token),
+      set: [inserted_at: dt, authenticated_at: dt]
+    )
+
+    Repo.get_by(UserToken, token: token)
   end
 end
