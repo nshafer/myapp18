@@ -128,6 +128,8 @@ defmodule Myapp18Web.UserAuthTest do
         conn |> put_session(:user_token, user_token) |> UserAuth.fetch_current_scope_for_user([])
 
       assert conn.assigns.current_scope.user.id == user.id
+      assert conn.assigns.current_scope.user.authenticated_at == user.authenticated_at
+      assert get_session(conn, :user_token) == user_token
     end
 
     test "authenticates user from cookies", %{conn: conn, user: user} do
@@ -143,6 +145,7 @@ defmodule Myapp18Web.UserAuthTest do
         |> UserAuth.fetch_current_scope_for_user([])
 
       assert conn.assigns.current_scope.user.id == user.id
+      assert conn.assigns.current_scope.user.authenticated_at == user.authenticated_at
       assert get_session(conn, :user_token) == user_token
       assert get_session(conn, :user_remember_me)
 
@@ -155,23 +158,6 @@ defmodule Myapp18Web.UserAuthTest do
       conn = UserAuth.fetch_current_scope_for_user(conn, [])
       refute get_session(conn, :user_token)
       refute conn.assigns.current_scope
-    end
-
-    test "does not reissue the session token after only a few hours", %{conn: conn, user: user} do
-      {token, user_token} = generate_offset_user_session_token(user, -2, :day)
-      assert DateTime.diff(DateTime.utc_now(), user_token.inserted_at) >= 2 * 24 * 60 * 60
-      {user, _} = Accounts.get_user_by_session_token(token)
-
-      conn =
-        conn
-        |> put_session(:user_token, token)
-        |> UserAuth.fetch_current_scope_for_user([])
-
-      assert conn.assigns.current_scope.user.id == user.id
-      assert conn.assigns.current_scope.user.authenticated_at == user.authenticated_at
-      assert get_session(conn, :user_token) == token
-      assert {_, token_inserted_at} = Accounts.get_user_by_session_token(token)
-      assert DateTime.diff(DateTime.utc_now(), token_inserted_at) >= 12 * 60 * 60
     end
 
     test "reissues a new token after a few days and refreshes cookie", %{conn: conn, user: user} do
