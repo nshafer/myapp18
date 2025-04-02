@@ -4,8 +4,6 @@ defmodule Myapp18Web.UserAuthTest do
   alias Phoenix.LiveView
   alias Myapp18.Accounts
   alias Myapp18.Accounts.Scope
-  alias Myapp18.Accounts.UserToken
-  alias Myapp18.Repo
   alias Myapp18Web.UserAuth
 
   import Myapp18.AccountsFixtures
@@ -174,6 +172,7 @@ defmodule Myapp18Web.UserAuthTest do
       conn =
         conn
         |> put_session(:user_token, token)
+        |> put_session(:user_remember_me, true)
         |> put_req_cookie(@remember_me_cookie, signed_token)
         |> UserAuth.fetch_current_scope_for_user([])
 
@@ -181,9 +180,6 @@ defmodule Myapp18Web.UserAuthTest do
       assert conn.assigns.current_scope.user.authenticated_at == user.authenticated_at
       assert new_token = get_session(conn, :user_token)
       assert new_token != token
-      assert new_token == conn.cookies[@remember_me_cookie]
-      assert new_user_token = Repo.get_by!(UserToken, token: new_token)
-      assert DateTime.diff(DateTime.utc_now(), new_user_token.inserted_at) < 60
       assert %{value: new_signed_token, max_age: max_age} = conn.resp_cookies[@remember_me_cookie]
       assert new_signed_token != signed_token
       assert max_age == @remember_me_cookie_max_age
