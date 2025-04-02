@@ -88,11 +88,6 @@ defmodule Myapp18.AccountsFixtures do
     {encoded_token, user_token.token}
   end
 
-  def generate_offset_user_session_token(user, amount_to_add, unit) do
-    token = Accounts.generate_user_session_token(user)
-    {token, offset_user_token(token, amount_to_add, unit)}
-  end
-
   def offset_user_token(token, amount_to_add, unit) do
     dt = DateTime.add(DateTime.utc_now(), amount_to_add, unit)
 
