@@ -48,18 +48,21 @@ defmodule Myapp18.Accounts.UserToken do
   end
 
   @doc """
-  Returns a query for for a user and the token's creation time for the given token.
+  Checks if the token is valid and returns its underlying lookup query.
 
-  The query will return nothing if the token is invalid or the user is not found.
+  The query returns the user found by the token, if any, along with the token's creation time.
 
   The token is valid if it matches the value in the database and it has
   not expired (after @session_validity_in_days).
   """
-  def valid_user_session_query(token) do
-    from token in by_token_and_context_query(token, "session"),
-      join: user in assoc(token, :user),
-      where: token.inserted_at > ago(@session_validity_in_days, "day"),
-      select: {%{user | authenticated_at: token.authenticated_at}, token.inserted_at}
+  def verify_session_token_query(token) do
+    query =
+      from token in by_token_and_context_query(token, "session"),
+        join: user in assoc(token, :user),
+        where: token.inserted_at > ago(@session_validity_in_days, "day"),
+        select: {%{user | authenticated_at: token.authenticated_at}, token.inserted_at}
+
+    {:ok, query}
   end
 
   @doc """
