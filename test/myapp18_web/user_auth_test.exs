@@ -170,8 +170,8 @@ defmodule Myapp18Web.UserAuthTest do
       assert conn.assigns.current_scope.user.id == user.id
       assert conn.assigns.current_scope.user.authenticated_at == user.authenticated_at
       assert get_session(conn, :user_token) == token
-      assert {_, token_created} = Accounts.get_user_by_session_token(token)
-      assert DateTime.diff(DateTime.utc_now(), token_created) >= 12 * 60 * 60
+      assert {_, token_inserted_at} = Accounts.get_user_by_session_token(token)
+      assert DateTime.diff(DateTime.utc_now(), token_inserted_at) >= 12 * 60 * 60
     end
 
     test "reissues a new token after a few days and refreshes cookie", %{conn: conn, user: user} do

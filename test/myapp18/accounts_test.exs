@@ -282,10 +282,10 @@ defmodule Myapp18.AccountsTest do
     end
 
     test "returns user by token", %{user: user, token: token} do
-      assert {session_user, token_created} = Accounts.get_user_by_session_token(token)
+      assert {session_user, token_inserted_at} = Accounts.get_user_by_session_token(token)
       assert session_user.id == user.id
       assert session_user.authenticated_at != nil
-      assert token_created != nil
+      assert token_inserted_at != nil
     end
 
     test "does not return user for invalid token" do
