@@ -236,12 +236,12 @@ defmodule Myapp18Web.UserAuth do
 
   defp mount_current_scope(socket, session) do
     Phoenix.Component.assign_new(socket, :current_scope, fn ->
-      if user_token = session["user_token"] do
-        {user, _} = Accounts.get_user_by_session_token(user_token) || {nil, nil}
-        Scope.for_user(user)
-      else
-        Scope.for_user(nil)
-      end
+      {user, _} =
+        if user_token = session["user_token"] do
+          Accounts.get_user_by_session_token(user_token)
+        end || {nil, nil}
+
+      Scope.for_user(user)
     end)
   end
 
