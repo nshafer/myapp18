@@ -290,20 +290,21 @@ defmodule Myapp18Web.UserAuthTest do
                UserAuth.on_mount(:require_sudo_mode, %{}, session, socket)
     end
 
-    test "redirects when authentication is too old", %{user: user} do
-      eleven_minutes_ago = DateTime.utc_now() |> DateTime.add(-11, :minute)
+    test "redirects when authentication is too old", %{conn: conn, user: user} do
+      eleven_minutes_ago = DateTime.utc_now(:second) |> DateTime.add(-11, :minute)
+      user = %{user | authenticated_at: eleven_minutes_ago}
+      user_token = Accounts.generate_user_session_token(user)
+      {user, token_inserted_at} = Accounts.get_user_by_session_token(user_token)
+      assert DateTime.compare(token_inserted_at, user.authenticated_at) == :gt
+      session = conn |> put_session(:user_token, user_token) |> get_session()
 
       socket = %LiveView.Socket{
         endpoint: AuthAppWeb.Endpoint,
-        assigns: %{
-          __changed__: %{},
-          flash: %{},
-          current_scope: Scope.for_user(%{user | authenticated_at: eleven_minutes_ago})
-        }
+        assigns: %{__changed__: %{}, flash: %{}}
       }
 
       assert {:halt, _updated_socket} =
-               UserAuth.on_mount(:require_sudo_mode, %{}, %{}, socket)
+               UserAuth.on_mount(:require_sudo_mode, %{}, session, socket)
     end
   end
 

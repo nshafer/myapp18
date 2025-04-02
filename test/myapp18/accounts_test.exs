@@ -271,6 +271,7 @@ defmodule Myapp18.AccountsTest do
       token = Accounts.generate_user_session_token(user)
       assert user_token = Repo.get_by(UserToken, token: token)
       assert user_token.authenticated_at == user.authenticated_at
+      assert DateTime.compare(user_token.inserted_at, user.authenticated_at) == :gt
     end
   end
 
