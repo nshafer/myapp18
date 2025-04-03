@@ -50,7 +50,7 @@ defmodule Myapp18Web.ConnCase do
 
     opts =
       context
-      |> Map.take([:token_inserted_at])
+      |> Map.take([:token_authenticated_at])
       |> Enum.into([])
 
     %{conn: log_in_user(conn, user, opts), user: user, scope: scope}
