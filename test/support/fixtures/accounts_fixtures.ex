@@ -64,15 +64,6 @@ defmodule Myapp18.AccountsFixtures do
     token
   end
 
-  def override_token_inserted_at(token, inserted_at) when is_binary(token) do
-    Myapp18.Repo.update_all(
-      from(t in Accounts.UserToken,
-        where: t.token == ^token
-      ),
-      set: [inserted_at: inserted_at]
-    )
-  end
-
   def override_token_authenticated_at(token, authenticated_at) when is_binary(token) do
     Myapp18.Repo.update_all(
       from(t in Accounts.UserToken,
