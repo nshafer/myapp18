@@ -9,7 +9,6 @@ defmodule Myapp18.AccountsFixtures do
   alias Myapp18.Accounts
   alias Myapp18.Accounts.Scope
   alias Myapp18.Accounts.UserToken
-  alias Myapp18.Repo
 
   def unique_user_email, do: "user#{System.unique_integer()}@example.com"
   def valid_user_password, do: "hello world!"
@@ -82,11 +81,11 @@ defmodule Myapp18.AccountsFixtures do
   def offset_user_token(token, amount_to_add, unit) do
     dt = DateTime.add(DateTime.utc_now(), amount_to_add, unit)
 
-    Repo.update_all(
+    Myapp18.Repo.update_all(
       from(ut in UserToken, where: ut.token == ^token),
       set: [inserted_at: dt, authenticated_at: dt]
     )
 
-    Repo.get_by(UserToken, token: token)
+    Myapp18.Repo.get_by(UserToken, token: token)
   end
 end
