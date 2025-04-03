@@ -154,8 +154,7 @@ defmodule Myapp18Web.UserAuth do
     end
   end
 
-  # Refresh the remember me cookie if it is set and it is the same as the old session token.
-  # This is to ensure the remember me cookie has the same expiration time as the session token.
+  # Refresh the remember me cookie with the new token and new expiration date.
   defp maybe_refresh_remember_me_cookie(conn, new_token) do
     if get_session(conn, :user_remember_me) do
       put_resp_cookie(conn, @remember_me_cookie, new_token, @remember_me_options)
