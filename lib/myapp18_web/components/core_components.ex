@@ -88,7 +88,7 @@ defmodule Myapp18Web.CoreComponents do
       <.button phx-click="go" variant="primary">Send!</.button>
       <.button navigate={~p"/"}>Home</.button>
   """
-  attr :rest, :global, include: ~w(href navigate patch)
+  attr :rest, :global, include: ~w(href navigate patch method)
   attr :variant, :string, values: ~w(primary)
   slot :inner_block, required: true
 
@@ -145,7 +145,7 @@ defmodule Myapp18Web.CoreComponents do
   attr :type, :string,
     default: "text",
     values: ~w(checkbox color date datetime-local email file month number password
-               range search select tel text textarea time url week)
+               search select tel text textarea time url week)
 
   attr :field, Phoenix.HTML.FormField,
     doc: "a form field struct retrieved from the form, for example: @form[:email]"
